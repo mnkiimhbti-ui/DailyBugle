@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Feed } from "@/components/Feed";
 import { FilterPanel } from "@/components/FilterPanel";
+import { RefreshButton } from "@/components/RefreshButton";
 import { StatusBar } from "@/components/StatusBar";
 import { useAdminKey } from "@/hooks/useAdminKey";
 import { useFilterState } from "@/hooks/useFilterState";
@@ -26,7 +27,7 @@ export function Dashboard() {
   }, [hydrated, mergeServerChannels]);
 
   const activeCount =
-    fs.filters.locations.length + (fs.filters.types.length < 2 ? 1 : 0) + (fs.filters.datePreset !== "any" ? 1 : 0) + fs.filters.activeChannelIds.length;
+    fs.filters.locations.length + fs.filters.categories.length + (fs.filters.types.length < 2 ? 1 : 0) + (fs.filters.datePreset !== "any" ? 1 : 0) + fs.filters.activeChannelIds.length;
 
   const panel = (
     <FilterPanel fs={fs} adminKey={adminKey} onNeedKey={() => setKeyDialog(true)} onChannelAdded={() => setRefreshToken(Date.now())} />
@@ -40,11 +41,15 @@ export function Dashboard() {
         <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-muted">
           <span className="hidden sm:inline">{dateline}</span>
           <span className="sm:hidden">{new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
-          <button onClick={() => setKeyDialog(true)} className="hover:text-accent">
-            {adminKey ? "Admin ✓" : "Admin"}
-          </button>
+          <span className="flex items-center gap-4">
+            {adminKey && <RefreshButton adminKey={adminKey} onDone={() => setRefreshToken(Date.now())} />}
+            <button onClick={() => setKeyDialog(true)} className="hover:text-accent">
+              {adminKey ? "Admin ✓" : "Admin"}
+            </button>
+          </span>
         </div>
         <h1 className="font-display mt-2 text-4xl font-black tracking-tight sm:text-6xl">The Daily Bugle</h1>
+        <p className="font-display mt-1 text-sm font-medium tracking-wide">Created by Mayank Mishra</p>
         <p className="mt-1 text-xs italic text-muted">From the world to your district. Updated at dawn and dusk.</p>
       </header>
 

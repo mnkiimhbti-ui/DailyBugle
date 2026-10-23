@@ -10,11 +10,19 @@ export function utcDay(d = new Date()): string {
 export async function addUsage(api: Api, units: number): Promise<void> {
   if (units <= 0) return;
   const day = utcDay();
-  await prisma.apiUsage.upsert({
-    where: { day_api: { day, api } },
-    create: { day, api, units },
-    update: { units: { increment: units } },
-  });
+  const upsert = () =>
+    prisma.apiUsage.upsert({
+      where: { day_api: { day, api } },
+      create: { day, api, units },
+      update: { units: { increment: units } },
+    });
+  try {
+    await upsert();
+  } catch (e) {
+    // Two parallel calls can both try to create today's row; the loser retries as an increment.
+    if ((e as { code?: string }).code !== "P2002") throw e;
+    await upsert();
+  }
 }
 
 export async function usageToday(api: Api): Promise<number> {

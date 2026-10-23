@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { LOCATION_BY_ID } from "@/lib/locations";
+import { CATEGORY_LABEL } from "@/lib/categories";
 import type { NewsDTO, VideoDTO } from "@/lib/feed-types";
 
 export function timeAgo(iso: string): string {
@@ -19,6 +20,20 @@ function placeLabels(tags: string[]): string[] {
         .sort((a, b) => rank(a) - rank(b))
     .slice(0, 2)
     .map((t) => LOCATION_BY_ID.get(t)?.label ?? t);
+}
+
+function CategoryTags({ ids }: { ids: string[] }) {
+  return (
+    <>
+      {ids
+        .filter((id) => id !== "general")
+        .map((id) => (
+          <span key={id} className="rounded border border-accent/40 px-1.5 py-0.5 text-[11px] font-medium text-accent">
+            {CATEGORY_LABEL.get(id) ?? id}
+          </span>
+        ))}
+    </>
+  );
 }
 
 export function NewsCard({ item }: { item: NewsDTO }) {
@@ -41,6 +56,7 @@ export function NewsCard({ item }: { item: NewsDTO }) {
           <h3 className="font-display text-lg font-semibold leading-snug">{item.title}</h3>
           {item.snippet && <p className="line-clamp-3 mt-2 text-sm text-muted">{item.snippet}</p>}
           <div className="mt-3 flex flex-wrap gap-1">
+            <CategoryTags ids={item.categories ?? []} />
             {placeLabels(item.locations).map((l) => (
               <span key={l} className="rounded bg-paper px-1.5 py-0.5 text-[11px] text-muted">
                 {l}
@@ -92,6 +108,11 @@ export function VideoCard({ item }: { item: VideoDTO }) {
         <a href={`https://www.youtube.com/watch?v=${item.videoId}`} target="_blank" rel="noopener noreferrer" className="hover:underline">
           <h3 className="font-display text-lg font-semibold leading-snug">{item.title}</h3>
         </a>
+        {(item.categories ?? []).some((c) => c !== "general") && (
+          <div className="mt-3 flex flex-wrap gap-1">
+            <CategoryTags ids={item.categories} />
+          </div>
+        )}
       </div>
     </article>
   );

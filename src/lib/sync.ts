@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { config } from "@/lib/env";
 import { LOCATION_BY_ID, LOCATIONS, isValidLocationId } from "@/lib/locations";
 import { tagArticle } from "@/lib/mentions";
+import { categorize } from "@/lib/categories";
 import { addUsage, tavilyRemainingThisMonth, youtubeRemainingToday } from "@/lib/quota";
 import { firstImage, tavilyNewsSearch } from "@/lib/tavily";
 import { getLatestUploads } from "@/lib/youtube";
@@ -68,8 +69,11 @@ async function syncNews(report: SyncReport): Promise<void> {
     return;
   }
   const plan = await planNewsQueries(budget);
+  let stop = false;
 
-  for (const locationId of plan) {
+  // 4 searches at a time, so a manual sync from the app finishes inside Vercel's 60s limit.
+  await runPool(plan, 4, async (locationId) => {
+    if (stop) return;
     const node = LOCATION_BY_ID.get(locationId)!;
     const cursor = await prisma.locationCursor.findUnique({ where: { locationId } });
     // Ask only for news since the last time this location was searched (1 day overlap), max 7 days back.
@@ -97,6 +101,7 @@ async function syncNews(report: SyncReport): Promise<void> {
           publishedAt: parseDate(r.published_date),
           score: r.score ?? null,
           locations: tagArticle(locationId, `${r.title} ${r.content ?? ""}`),
+          categories: categorize(r.title, r.content ?? ""),
         }));
 
       if (rows.length) {
@@ -128,19 +133,27 @@ async function syncNews(report: SyncReport): Promise<void> {
       const err = e as Error & { status?: number };
       report.errors.push(`news ${locationId}: ${err.message}`);
       // Rate limited, out of credits or bad key: stop spending, try again next run.
-      if (err.status === 401 || err.status === 429 || err.status === 432 || err.status === 433) break;
+      if (err.status === 401 || err.status === 429 || err.status === 432 || err.status === 433) stop = true;
     }
-  }
+  });
+}
+
+/** Runs `fn` over `items` with at most `limit` in flight. */
+async function runPool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) await fn(items[next++]);
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }
 
 async function syncVideos(report: SyncReport): Promise<void> {
   const channels = await prisma.trackedChannel.findMany({ orderBy: { lastSyncedAt: { sort: "asc", nulls: "first" } } });
   let remaining = await youtubeRemainingToday();
-  for (const ch of channels) {
-    if (remaining < 1) {
-      report.errors.push("YouTube daily budget reached, remaining channels wait for next run");
-      break;
-    }
+  let stop = false;
+  if (channels.length > remaining) report.errors.push("YouTube daily budget reached, remaining channels wait for next run");
+  await runPool(channels.slice(0, remaining), 5, async (ch) => {
+    if (stop) return;
     try {
       const added = await syncChannelUploads(ch.channelId, ch.uploadsPlaylistId);
       report.videosAdded += added;
@@ -149,9 +162,17 @@ async function syncVideos(report: SyncReport): Promise<void> {
     } catch (e) {
       const err = e as Error & { quota?: boolean };
       report.errors.push(`video ${ch.title}: ${err.message}`);
-      if (err.quota) break;
+      if (err.quota) stop = true;
     }
-  }
+  });
+}
+
+/** Most recent run that is still going or finished recently. Used to block double syncs. */
+export async function recentSync(withinMinutes: number) {
+  return prisma.syncLog.findFirst({
+    where: { startedAt: { gte: new Date(Date.now() - withinMinutes * 60_000) } },
+    orderBy: { startedAt: "desc" },
+  });
 }
 
 /** 1 YouTube unit. Shared by the cron and by "add channel". */
@@ -159,11 +180,23 @@ export async function syncChannelUploads(channelId: string, uploadsPlaylistId: s
   const videos = await getLatestUploads(uploadsPlaylistId, config.videosPerChannel());
   await addUsage("youtube", 1);
   const created = await prisma.videoItem.createMany({
-    data: videos.map((v) => ({ ...v, channelId })),
+    data: videos.map((v) => ({ ...v, channelId, categories: categorize(v.title, v.description) })),
     skipDuplicates: true,
   });
   await prisma.trackedChannel.update({ where: { channelId }, data: { lastSyncedAt: new Date() } });
   return created.count;
+}
+
+/** Tags items saved before categories existed, or after the keyword lists change. No API cost. */
+async function backfillCategories(report: SyncReport): Promise<void> {
+  try {
+    const news = await prisma.newsItem.findMany({ where: { categories: { isEmpty: true } }, select: { id: true, title: true, snippet: true }, take: 2000 });
+    for (const n of news) await prisma.newsItem.update({ where: { id: n.id }, data: { categories: categorize(n.title, n.snippet) } });
+    const vids = await prisma.videoItem.findMany({ where: { categories: { isEmpty: true } }, select: { id: true, title: true, description: true }, take: 2000 });
+    for (const v of vids) await prisma.videoItem.update({ where: { id: v.id }, data: { categories: categorize(v.title, v.description) } });
+  } catch (e) {
+    report.errors.push(`categories: ${(e as Error).message}`);
+  }
 }
 
 async function cleanup(report: SyncReport): Promise<void> {
@@ -184,6 +217,7 @@ export async function runSync(trigger: string, opts: { news?: boolean; videos?: 
   try {
     if (opts.news !== false) await syncNews(report);
     if (opts.videos !== false) await syncVideos(report);
+    await backfillCategories(report);
     await cleanup(report);
   } finally {
     await prisma.syncLog.update({

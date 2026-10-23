@@ -25,11 +25,14 @@ model NewsItem {
   source      String
   publishedAt DateTime
   locations   String[]
+  /// Topic ids from src/lib/categories.ts, e.g. ["sports"] or ["business", "technology"]
+  categories  String[] @default([])
   score       Float?
   fetchedAt   DateTime @default(now())
 
   @@index([publishedAt(sort: Desc)])
   @@index([locations], type: Gin)
+  @@index([categories], type: Gin)
 }
 
 /// A YouTube upload pulled from a tracked channel's Uploads playlist.
@@ -41,6 +44,7 @@ model VideoItem {
   title        String
   description  String
   thumbnailUrl String?
+  categories   String[]       @default([])
   publishedAt  DateTime
   fetchedAt    DateTime       @default(now())
 

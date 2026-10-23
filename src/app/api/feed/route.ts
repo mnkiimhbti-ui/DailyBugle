@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { isValidLocationId } from "@/lib/locations";
+import { isValidCategory } from "@/lib/categories";
 import type { FeedItem, FeedResponse } from "@/lib/feed-types";
 
 /**
@@ -10,6 +11,7 @@ import type { FeedItem, FeedResponse } from "@/lib/feed-types";
  *   locations  comma separated ids   (default: no location filter)
  *   from, to   ISO date or datetime  (inclusive)
  *   channels   comma separated YouTube channel ids (default: all tracked)
+ *   categories comma separated category ids (default: all), applies to articles and videos
  *   cursor     ISO datetime from the previous page's nextCursor
  *   limit      1..60 (default 30)
  *
@@ -33,6 +35,8 @@ export async function GET(req: Request) {
     types.add("video");
   }
   const locations = list(sp.get("locations")).filter(isValidLocationId).slice(0, 200);
+  const categories = list(sp.get("categories")).filter(isValidCategory);
+  const catFilter = categories.length ? { categories: { hasSome: categories } } : {};
   const channels = list(sp.get("channels")).filter((c) => /^UC[\w-]{22}$/.test(c)).slice(0, 100);
   const from = parseDate(sp.get("from"));
   const to = parseDate(sp.get("to"), true);
@@ -47,14 +51,14 @@ export async function GET(req: Request) {
   const [news, videos] = await Promise.all([
     types.has("text")
       ? prisma.newsItem.findMany({
-          where: { publishedAt, ...(locations.length ? { locations: { hasSome: locations } } : {}) },
+          where: { publishedAt, ...catFilter, ...(locations.length ? { locations: { hasSome: locations } } : {}) },
           orderBy: { publishedAt: "desc" },
           take: limit + 1,
         })
       : Promise.resolve([]),
     types.has("video")
       ? prisma.videoItem.findMany({
-          where: { publishedAt, ...(channels.length ? { channelId: { in: channels } } : {}) },
+          where: { publishedAt, ...catFilter, ...(channels.length ? { channelId: { in: channels } } : {}) },
           orderBy: { publishedAt: "desc" },
           take: limit + 1,
           include: { channel: { select: { title: true } } },
@@ -74,6 +78,7 @@ export async function GET(req: Request) {
       source: n.source,
       publishedAt: n.publishedAt.toISOString(),
       locations: n.locations,
+      categories: n.categories,
     })),
     ...videos.map((v) => ({
       kind: "video" as const,
@@ -85,6 +90,7 @@ export async function GET(req: Request) {
       publishedAt: v.publishedAt.toISOString(),
       channelId: v.channelId,
       channelTitle: v.channel.title,
+      categories: v.categories,
     })),
   ].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
 

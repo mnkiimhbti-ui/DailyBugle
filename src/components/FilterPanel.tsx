@@ -4,6 +4,7 @@ import { ChannelChips } from "@/components/ChannelChips";
 import { LocationPicker } from "@/components/LocationPicker";
 import type { DatePreset, useFilterState } from "@/hooks/useFilterState";
 import type { ContentType } from "@/lib/feed-types";
+import { ALL_CATEGORIES } from "@/lib/categories";
 
 type FS = ReturnType<typeof useFilterState>;
 
@@ -52,6 +53,32 @@ export function FilterPanel({ fs, adminKey, onNeedKey, onChannelAdded }: { fs: F
               {t === "text" ? "Articles" : "Videos"}
             </label>
           ))}
+        </div>
+      </Section>
+
+      <Section title="Category">
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            onClick={() => update({ categories: [] })}
+            className={`rounded-full border px-2.5 py-1 text-xs transition ${
+              filters.categories.length === 0 ? "border-ink bg-ink text-paper" : "border-rule bg-card hover:border-ink/40"
+            }`}
+          >
+            All
+          </button>
+          {ALL_CATEGORIES.map((c) => {
+            const on = filters.categories.includes(c.id);
+            return (
+              <button
+                key={c.id}
+                onClick={() => toggleIn("categories", c.id)}
+                aria-pressed={on}
+                className={`rounded-full border px-2.5 py-1 text-xs transition ${on ? "border-accent bg-accent text-white" : "border-rule bg-card hover:border-ink/40"}`}
+              >
+                {c.label}
+              </button>
+            );
+          })}
         </div>
       </Section>
 

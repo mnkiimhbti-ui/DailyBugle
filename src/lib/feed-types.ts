@@ -13,6 +13,7 @@ export interface NewsDTO {
   source: string;
   publishedAt: string;
   locations: string[];
+  categories: string[];
 }
 
 export interface VideoDTO {
@@ -25,6 +26,7 @@ export interface VideoDTO {
   publishedAt: string;
   channelId: string;
   channelTitle: string;
+  categories: string[];
 }
 
 export type FeedItem = NewsDTO | VideoDTO;

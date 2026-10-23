@@ -19,6 +19,10 @@ YouTube gives 10,000 units a day, so even 200 channels cost only 400 units a day
 
 The app keeps its own ledger of credits used (the `ApiUsage` table) and stops before the free limits: 950 Tavily credits a month and 9,000 YouTube units a day. A rate limit or "out of credits" response stops the run immediately instead of retrying.
 
+**Categories**
+
+Every article and video is tagged with up to two topics: Politics, Business and Finance, Technology, Sports, Entertainment, Health, Science and Space, Environment and Weather, Crime and Law, Education and Jobs, or General when nothing matches. Tagging uses keyword matching on the title and text, so it costs no API calls. The keyword lists live in `src/lib/categories.ts`; items with no tags are re-tagged on the next sync. The Category filter applies to articles and videos alike.
+
 **How locations are covered within 16 searches a run**
 
 There are 13 regions, 36 states and UTs, and 725 districts, far more than 16 searches. So each run searches:
@@ -102,6 +106,8 @@ After that it runs on its own at about 06:15 and 18:15 IST. Note that GitHub pau
 1. Open your Vercel URL, click **Admin** in the top corner and paste your `ADMIN_KEY`. It is stored only in that browser.
 2. Pick locations, content types and a date range. Everything is saved in the browser's localStorage and applied automatically next time you open the app.
 3. Under **YouTube channels**, paste a channel URL or `@handle` (cheap) or type a name and press **Find** (costlier). Add it as a chip. Its latest uploads appear straight away, and the sync keeps it fresh. Tap chips to show only some channels; with none selected, all are shown.
+4. To fetch new stories between the scheduled runs, click **Refresh now** next to Admin. Each press uses about 16 Tavily credits, and it is blocked for 15 minutes after any sync so a double click can't waste credits.
+4. To fetch new stories between the scheduled runs, click **Refresh now** next to Admin. Each press uses about 16 Tavily credits, and it is blocked for 15 minutes after any sync so a double click can't waste credits.
 
 
 **Project layout**
@@ -115,6 +121,7 @@ src/lib/tavily.ts               Tavily client (basic depth, 1 credit per call)
 src/lib/youtube.ts              YouTube client (search, channels, playlistItems)
 src/lib/locations.ts            Global, 13 regions, India, 36 states and UTs, 725 districts
 src/lib/mentions.ts             tags articles with the states and districts they mention
+src/lib/categories.ts           topic categories by keyword (edit the lists to tune)
 src/lib/quota.ts                usage ledger and hard caps
 src/data/india.json             state and district list (edit freely)
 src/hooks/useFilterState.ts     filter state persisted to localStorage
@@ -122,13 +129,13 @@ src/components/                 dashboard, filters, location picker, channel chi
 src/app/api/feed                serves the filtered feed from the database
 src/app/api/channels            list, add and remove tracked channels
 src/app/api/channels/search     channel lookup (the only place search.list is used)
-src/app/api/sync                manual sync trigger (admin key)
+src/app/api/sync                the Refresh now button (admin key, 15 min cooldown)
 src/app/api/status              last sync and quota usage, shown in the footer
 ```
 
 **API reference**
 
-`GET /api/feed` accepts `types=text,video`, `locations=country:india,district:haryana:gurugram`, `from` and `to` as `YYYY-MM-DD` (IST days), `channels=UC...,UC...`, `cursor` (from the previous page's `nextCursor`) and `limit` (up to 60). Responses are cached at the edge for five minutes, since the data only changes twice a day.
+`GET /api/feed` accepts `types=text,video`, `categories=sports,business`, `locations=country:india,district:haryana:gurugram`, `from` and `to` as `YYYY-MM-DD` (IST days), `channels=UC...,UC...`, `cursor` (from the previous page's `nextCursor`) and `limit` (up to 60). Responses are cached at the edge for five minutes, since the data only changes twice a day.
 
 Location ids follow this pattern: `global`, `region:<slug>`, `country:india`, `state:<state-slug>`, `district:<state-slug>:<district-slug>`. Slugs are lowercase with hyphens, so Gurugram is `district:haryana:gurugram` and Tamil Nadu is `state:tamil-nadu`. The full list is generated from `src/data/india.json` and the `REGIONS` list in `src/lib/locations.ts`.
 

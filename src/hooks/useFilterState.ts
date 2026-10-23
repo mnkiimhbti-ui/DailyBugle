@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { isValidLocationId } from "@/lib/locations";
+import { isValidCategory } from "@/lib/categories";
 import type { ChannelDTO, ContentType } from "@/lib/feed-types";
 
 export type DatePreset = "any" | "1d" | "3d" | "7d" | "30d" | "custom";
@@ -11,6 +12,8 @@ export interface FilterState {
   version: 1;
   locations: string[];
   types: ContentType[];
+  /** Topic ids. Empty means all categories. */
+  categories: string[];
   /** Relative presets are stored as presets, so "last 7 days" stays relative when you reopen the app. */
   datePreset: DatePreset;
   from: string | null; // YYYY-MM-DD, used when datePreset === "custom"
@@ -25,6 +28,7 @@ export const DEFAULT_FILTERS: FilterState = {
   version: 1,
   locations: ["country:india"],
   types: ["text", "video"],
+  categories: [],
   datePreset: "7d",
   from: null,
   to: null,
@@ -45,6 +49,7 @@ function migrate(raw: unknown): FilterState {
     version: 1,
     locations: (Array.isArray(r.locations) ? r.locations : DEFAULT_FILTERS.locations).filter(isValidLocationId),
     types: types.length ? types : DEFAULT_FILTERS.types,
+    categories: (Array.isArray(r.categories) ? r.categories : []).filter((c): c is string => typeof c === "string" && isValidCategory(c)),
     datePreset: (["any", "1d", "3d", "7d", "30d", "custom"] as const).includes(r.datePreset as DatePreset)
       ? (r.datePreset as DatePreset)
       : DEFAULT_FILTERS.datePreset,
@@ -78,7 +83,7 @@ export function useFilterState() {
   const update = useCallback((patch: Partial<FilterState>) => setFilters((f) => ({ ...f, ...patch })), [setFilters]);
 
   const toggleIn = useCallback(
-    <K extends "locations" | "types" | "activeChannelIds">(key: K, value: FilterState[K][number]) =>
+    <K extends "locations" | "types" | "categories" | "activeChannelIds">(key: K, value: FilterState[K][number]) =>
       setFilters((f) => {
         const arr = f[key] as string[];
         const next = arr.includes(value as string) ? arr.filter((v) => v !== value) : [...arr, value as string];
@@ -123,6 +128,7 @@ export function useFilterState() {
     const p = new URLSearchParams();
     p.set("types", filters.types.join(","));
     if (filters.locations.length) p.set("locations", filters.locations.join(","));
+    if (filters.categories.length) p.set("categories", filters.categories.join(","));
     const { from, to } = resolveDateRange(filters);
     if (from) p.set("from", from);
     if (to) p.set("to", to);
