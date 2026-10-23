@@ -1,0 +1,48 @@
+name: Sync news and videos
+
+on:
+  schedule:
+    # 06:17 and 18:17 IST (00:47 and 12:47 UTC). Off the hour because
+    # GitHub delays jobs scheduled exactly on :00 during busy periods.
+    - cron: "47 0 * * *"
+    - cron: "47 12 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "What to sync"
+        type: choice
+        options: [all, news-only, videos-only]
+        default: all
+
+concurrency:
+  group: sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+      YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+      PRIORITY_LOCATIONS: ${{ vars.PRIORITY_LOCATIONS }}
+      TAVILY_QUERIES_PER_SYNC: ${{ vars.TAVILY_QUERIES_PER_SYNC }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Idempotent: creates tables on first run, no-op afterwards.
+      # Refuses (fails) rather than dropping data if a change would be destructive.
+      - run: npx prisma db push --skip-generate
+      - name: Run sync
+        run: |
+          case "${{ inputs.mode }}" in
+            news-only)   npm run sync -- --news-only ;;
+            videos-only) npm run sync -- --videos-only ;;
+            *)           npm run sync ;;
+          esac

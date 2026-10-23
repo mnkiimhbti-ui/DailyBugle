@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+/* Newsprint palette. Light is paper and ink, dark is a night edition. */
+@theme {
+  --color-paper: #f6f1e7;
+  --color-card: #fffdf8;
+  --color-ink: #1b1a17;
+  --color-muted: #6b665c;
+  --color-rule: #d9d1c1;
+  --color-accent: #b3261e;
+  --color-accent-soft: #f3dcd8;
+  --font-display: "Fraunces Variable", Georgia, serif;
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: #15140f;
+    --color-card: #1e1c17;
+    --color-ink: #ece6d8;
+    --color-muted: #a39c8c;
+    --color-rule: #36332a;
+    --color-accent: #e5574c;
+    --color-accent-soft: #3a1f1c;
+  }
+}
+
+html,
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Masonry via CSS columns: no JS layout, works with infinite scroll. */
+.masonry {
+  column-gap: 1.25rem;
+  columns: 1;
+}
+@media (min-width: 640px) {
+  .masonry { columns: 2; }
+}
+@media (min-width: 1280px) {
+  .masonry { columns: 3; }
+}
+.masonry > * {
+  break-inside: avoid;
+  margin-bottom: 1.25rem;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+::selection {
+  background: var(--color-accent-soft);
+}

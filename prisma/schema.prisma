@@ -1,0 +1,95 @@
+// Prisma schema for DailyBugle (Postgres on Neon)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+/// A news article returned by Tavily.
+/// `locations` holds hierarchical tags, e.g.
+///   ["global"], ["region:sea"],
+///   ["country:india", "state:haryana", "district:haryana:gurugram"]
+/// so a single `hasSome` filter can serve any combination of selections.
+model NewsItem {
+  id          String   @id @default(cuid())
+  url         String   @unique
+  title       String
+  snippet     String
+  imageUrl    String?
+  faviconUrl  String?
+  source      String
+  publishedAt DateTime
+  locations   String[]
+  score       Float?
+  fetchedAt   DateTime @default(now())
+
+  @@index([publishedAt(sort: Desc)])
+  @@index([locations], type: Gin)
+}
+
+/// A YouTube upload pulled from a tracked channel's Uploads playlist.
+model VideoItem {
+  id           String         @id @default(cuid())
+  videoId      String         @unique
+  channelId    String
+  channel      TrackedChannel @relation(fields: [channelId], references: [channelId], onDelete: Cascade)
+  title        String
+  description  String
+  thumbnailUrl String?
+  publishedAt  DateTime
+  fetchedAt    DateTime       @default(now())
+
+  @@index([channelId, publishedAt(sort: Desc)])
+  @@index([publishedAt(sort: Desc)])
+}
+
+/// Channels the user has added as chips. Looked up ONCE via the YouTube API,
+/// after which only the cheap playlistItems endpoint (1 unit) is used.
+model TrackedChannel {
+  id                String      @id @default(cuid())
+  channelId         String      @unique
+  title             String
+  handle            String?
+  thumbnailUrl      String?
+  uploadsPlaylistId String
+  lookupQuery       String
+  addedAt           DateTime    @default(now())
+  lastSyncedAt      DateTime?
+  videos            VideoItem[]
+}
+
+/// Remembers when each location was last searched so the twice daily sync can
+/// rotate through all locations without exceeding the Tavily free tier.
+model LocationCursor {
+  locationId     String   @id
+  lastQueriedAt  DateTime
+  lastResultCount Int     @default(0)
+}
+
+/// Units / credits spent per API per UTC day. Used as a hard safety cap.
+model ApiUsage {
+  id    String @id @default(cuid())
+  day   String // YYYY-MM-DD (UTC)
+  api   String // "tavily" | "youtube"
+  units Int    @default(0)
+
+  @@unique([day, api])
+}
+
+/// One row per sync run, for debugging from Prisma Studio.
+model SyncLog {
+  id         String    @id @default(cuid())
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  trigger    String
+  newsAdded  Int       @default(0)
+  videosAdded Int      @default(0)
+  tavilyUsed Int       @default(0)
+  youtubeUsed Int      @default(0)
+  errors     String[]
+}
