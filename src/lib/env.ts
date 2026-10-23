@@ -9,6 +9,12 @@ export function requireEnv(name: string): string {
   return v;
 }
 
+export const DEFAULT_PRIORITY_LOCATIONS = [
+  "district:haryana:gurugram",
+  "district:uttar-pradesh:chandauli",
+  "district:uttar-pradesh:varanasi",
+].join(",");
+
 export const config = {
   tavilyQueriesPerSync: () => int("TAVILY_QUERIES_PER_SYNC", 16),
   tavilyMaxResults: () => Math.min(int("TAVILY_MAX_RESULTS", 20), 20),
@@ -19,8 +25,9 @@ export const config = {
   maxChannelSearchesPerDay: () => int("MAX_CHANNEL_SEARCHES_PER_DAY", 20),
   videosPerChannel: () => Math.min(int("VIDEOS_PER_CHANNEL", 15), 50),
   retentionDays: () => int("RETENTION_DAYS", 30),
+  /** Searched on every run. Overridden by the PRIORITY_LOCATIONS variable when it is set. */
   priorityLocations: () =>
-    (process.env.PRIORITY_LOCATIONS ?? "")
+    (process.env.PRIORITY_LOCATIONS || DEFAULT_PRIORITY_LOCATIONS)
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),

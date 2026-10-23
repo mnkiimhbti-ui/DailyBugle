@@ -24,7 +24,7 @@ The app keeps its own ledger of credits used (the `ApiUsage` table) and stops be
 There are 13 regions, 36 states and UTs, and 725 districts, far more than 16 searches. So each run searches:
 
 1. Global and India, every run.
-2. Anything in `PRIORITY_LOCATIONS`, every run (for example your home district).
+2. The priority districts, every run. By default these are Gurugram, Chandauli and Varanasi; set `PRIORITY_LOCATIONS` to change them.
 3. The rest of the budget rotates through regions and states, least recently searched first. Every region and state gets refreshed roughly every two days.
 
 Districts are mostly covered by tagging. When an India level or state level article names a district (Gurugram, Gurgaon, Bengaluru, Bangalore and so on), it is tagged with that district. Picking a district in the filter shows those stories. Within India the tags roll up: picking India shows all Indian stories, picking a state shows that state and its districts. Global and each region are separate scopes.
@@ -92,7 +92,7 @@ GitHub Pages can only host static files, so the site itself runs on Vercel's fre
 
 1. In the GitHub repo open **Settings**, then **Secrets and variables**, then **Actions**.
 2. On the **Secrets** tab add these as repository secrets: `DATABASE_URL`, `DIRECT_URL`, `TAVILY_API_KEY`, `YOUTUBE_API_KEY`.
-3. Optional, on the **Variables** tab: add `PRIORITY_LOCATIONS` (for example `district:haryana:gurugram`) and `TAVILY_QUERIES_PER_SYNC`.
+3. Optional, on the **Variables** tab: add `PRIORITY_LOCATIONS` to replace the default priority districts (Gurugram, Chandauli, Varanasi), and `TAVILY_QUERIES_PER_SYNC`.
 4. Open the **Actions** tab, choose **Sync news and videos**, and click **Run workflow** to do the first sync now. The first run also creates the database tables if Step 4 was skipped.
 
 After that it runs on its own at about 06:15 and 18:15 IST. Note that GitHub pauses scheduled workflows in a repo with no commits for 60 days; it emails you first, and one click re-enables it.
@@ -141,7 +141,7 @@ All optional, set in `.env`, Vercel, or GitHub Actions variables:
 | `TAVILY_QUERIES_PER_SYNC` | 16 | Searches per run. Keep runs a day x 30 x this under 1,000 |
 | `TAVILY_MAX_RESULTS` | 20 | Articles per search (same 1 credit for 5 or 20) |
 | `TAVILY_MONTHLY_BUDGET` | 950 | Hard stop for the month |
-| `PRIORITY_LOCATIONS` | none | Comma separated location ids searched every run |
+| `PRIORITY_LOCATIONS` | Gurugram, Chandauli, Varanasi | Comma separated location ids searched every run |
 | `VIDEOS_PER_CHANNEL` | 15 | Uploads pulled per channel per run (still 1 unit) |
 | `MAX_CHANNEL_SEARCHES_PER_DAY` | 20 | Cap on 100 unit name searches |
 | `RETENTION_DAYS` | 30 | Older items are deleted |
